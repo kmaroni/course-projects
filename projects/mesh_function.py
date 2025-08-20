@@ -1,6 +1,6 @@
 import numpy as np
 from collections.abc import Callable
-
+import matplotlib.pyplot as plt
 
 def mesh_function(f: Callable[[float], float], t: float) -> np.ndarray:
     Nt = len(t)
@@ -23,3 +23,12 @@ def test_mesh_function():
 
 if __name__ == "__main__":
     test_mesh_function()
+
+    dt = 0.1
+    t = np.arange(0,4,dt)
+    fun = mesh_function(func, t)
+
+    plt.plot(t,fun,marker='s',linestyle='-',markersize='3')
+    plt.xlabel('t')
+    plt.ylabel('f(t)')
+    plt.show()
