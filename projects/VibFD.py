@@ -11,6 +11,8 @@ We use various boundary conditions.
 import numpy as np
 import matplotlib.pyplot as plt
 import sympy as sp
+from scipy import sparse
+
 
 t = sp.Symbol("t")
 
@@ -153,6 +155,10 @@ class VibFD2(VibSolver):
 
     def __call__(self) -> np.ndarray:
         u = np.zeros(self.Nt + 1)
+        g = 2 - self.w**2*self.dt
+        D = sparse.diags([1,-g,1],np.array([-1,0,1]),(self.Nt+1,self.Nt+1),'lil')
+        D[0,:3] = 1, 0, 0; D[-1,-3:] = 0, 0, 1
+        b = np.zeros(self.Nt+1); b[0], b[-1] = self.I, self.I
         return u
 
 
