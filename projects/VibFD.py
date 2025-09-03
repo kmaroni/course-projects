@@ -25,7 +25,7 @@ class VibSolver:
 
     """
 
-    def __init__(self, Nt: int, T: float, w: float = 0.35, I: float = 1.0) -> None:
+    def __init__(self, Nt: int, T: float, w: float = 0.35, I: float = 1.0, u_e: sp.Expr = None) -> None:
         """
         Parameters
         ----------
@@ -39,6 +39,7 @@ class VibSolver:
         self.I = I
         self.w = w
         self.T = T
+        self.u_e = u_e
         self.set_mesh(Nt)
 
     def set_mesh(self, Nt: int) -> None:
@@ -55,7 +56,10 @@ class VibSolver:
 
     def ue(self) -> sp.Expr:
         """Return exact solution as sympy function"""
-        return self.I * sp.cos(self.w * t)
+        if self.u_e: #if given manufactured solution
+            return self.u_e
+        else:
+            return self.I * sp.cos(self.w * t)
 
     def u_exact(self) -> np.ndarray:
         """Exact solution of the vibration equation
@@ -65,6 +69,7 @@ class VibSolver:
         ue : array_like
             The solution at times n*dt
         """
+
         return sp.lambdify(t, self.ue())(self.t)
 
     def l2_error(self) -> float:
@@ -148,17 +153,25 @@ class VibFD2(VibSolver):
 
     order: int = 2
 
-    def __init__(self, Nt: int, T: float, w: float = 0.35, I: float = 1.0) -> None:
-        VibSolver.__init__(self, Nt, T, w, I)
-        T = T * w / np.pi
-        assert T.is_integer() and T % 2 == 0
+    def __init__(self, Nt: int, T: float, w: float = 0.35, I: float = 1.0, u_e: sp.Expr = None) -> None:
+        VibSolver.__init__(self, Nt, T, w, I, u_e)
+        if not self.u_e:
+            T = T * w / np.pi
+            assert T.is_integer() and T % 2 == 0
 
     def __call__(self) -> np.ndarray:
         u = np.zeros(self.Nt + 1)
-        g = 2 - self.w**2*self.dt
+        g = 2 - self.w**2*self.dt**2
         D = sparse.diags([1,-g,1],np.array([-1,0,1]),(self.Nt+1,self.Nt+1),'lil')
         D[0,:3] = 1, 0, 0; D[-1,-3:] = 0, 0, 1
         b = np.zeros(self.Nt+1); b[0], b[-1] = self.I, self.I
+        if self.u_e:
+            u2 = sp.diff(self.ue(),t,2)+self.w**2*self.ue()
+            f = sp.lambdify(t,u2)(self.t)
+            b[0], b[-1] = self.u_exact()[0], self.u_exact()[-1]
+            b[1:-1] = f[1:-1]*self.dt**2
+        u = sparse.linalg.spsolve(D.tocsr(), b)
+
         return u
 
 
@@ -181,6 +194,12 @@ class VibFD3(VibSolver):
 
     def __call__(self) -> np.ndarray:
         u = np.zeros(self.Nt + 1)
+        g = 2 - self.w**2*self.dt**2
+        D = sparse.diags([1,-g,1],np.array([-1,0,1]),(self.Nt+1,self.Nt+1),'lil')
+        D[0,:3] = 1, 0, 0;
+        D[-1,-3:] = 1, -4, 3
+        b = np.zeros(self.Nt+1); b[0] = self.I
+        u = sparse.linalg.spsolve(D.tocsr(), b)
         return u
 
 
@@ -197,6 +216,13 @@ class VibFD4(VibFD2):
 
     def __call__(self) -> np.ndarray:
         u = np.zeros(self.Nt + 1)
+        g = 12*self.w**2*self.dt**2
+        D = sparse.diags([-1,16,-30+g,16,-1],np.array([-2,-1,0,1,2]),(self.Nt+1,self.Nt+1),'lil')
+        D[0,:6] = 1, 0, 0, 0, 0, 0; D[-1,-6:] = 0, 0, 0, 0, 0, 1
+        D[1,:6] = 10, -15+g, -4, 14, -6, 1
+        D[-2,-6:] = 1, -6, 14, -4, -15+g, 10
+        b = np.zeros(self.Nt+1); b[0],b[-1] = self.I, self.I
+        u = sparse.linalg.spsolve(D.tocsr(), b)
         return u
 
 
@@ -204,6 +230,8 @@ def test_order():
     w = 0.35
     VibHPL(8, 2 * np.pi / w, w).test_order()
     VibFD2(8, 2 * np.pi / w, w).test_order()
+    VibFD2(8, 1, w, u_e = t**4).test_order()
+    VibFD2(8, 1, w, u_e = sp.exp(sp.sin(t))).test_order()
     VibFD3(8, 2 * np.pi / w, w).test_order()
     VibFD4(8, 2 * np.pi / w, w).test_order(N0=20)
 
