@@ -56,11 +56,12 @@ class Wave1D:
         The returned matrix is not divided by dx**2
         """
         D = sparse.diags([1, -2, 1], [-1, 0, 1], (self.N + 1, self.N + 1), "lil")
-        if bc == 0: #bake Dirichlet into stencil
+        if bc == 0: # Dirichlet condition is baked into stencil
             D[0,:3] = 0, 0, 0
             D[-1,-3:] = 0, 0, 0
         if bc == 1:  # Neumann condition is baked into stencil
-            raise NotImplementedError
+            D[0,:3] = -2, 2, 0
+            D[-1,-3:] = 0, 2, -2
 
         elif bc == 3:  # periodic (Note u[0] = u[-1])
             raise NotImplementedError
