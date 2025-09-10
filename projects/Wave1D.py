@@ -55,25 +55,40 @@ class Wave1D:
         ----
         The returned matrix is not divided by dx**2
         """
-        D = sparse.diags([1, -2, 1], [-1, 0, 1], (self.N + 1, self.N + 1), "lil")
-        if bc == 0: # Dirichlet condition is baked into stencil
-            D[0,:3] = 0, 0, 0
-            D[-1,-3:] = 0, 0, 0
-        if bc == 1:  # Neumann condition is baked into stencil
-            D[0,:3] = -2, 2, 0
-            D[-1,-3:] = 0, 2, -2
 
-        elif bc == 3:  # periodic (Note u[0] = u[-1])
+        if isinstance(bc, int): #allow int input if same BC on both ends
+            bcl, bcr = bc, bc
+        if isinstance(bc,dict):
+            bcl = bc['left']
+            bcr = bc['right']
+            if (bcl != bcr) and (bcl == 3 or bcr == 3): #Check if periodic bc is mixed
+                raise RuntimeError('Cannot mix Periodic boundary with other BC!')
+
+        D = sparse.diags([1, -2, 1], [-1, 0, 1], (self.N + 1, self.N + 1), "lil")
+        if bcl == 0: # Dirichlet condition is baked into stencil
+            D[0,:3] = 0, 0, 0
+
+        elif bcl == 1:  # Neumann condition is baked into stencil
+            D[0,:3] = -2, 2, 0
+
+        elif bcl == 3:  # periodic (Note u[0] = u[-1])
             D[0,-2] = 1
+
+        if bcr == 0:
+            D[-1,-3:] = 0, 0, 0
+
+        elif bcr == 1:
+            D[-1,-3:] = 0, 2, -2
 
         return D
 
-    def apply_bcs(self, bc: int, u: np.ndarray | None = None):
+    def apply_bcs(self, bc, u: np.ndarray | None = None):
         """Apply boundary conditions to solution vector
 
         Parameters
         ----------
-        bc : int
+        bc : dict
+            {'left':bcl, 'right':bcr}
             Boundary condition in space
             - 0 Dirichlet
             - 1 Neumann
@@ -84,24 +99,37 @@ class Wave1D:
             If not provided, use self.unp1
 
         """
-        u = u if u is not None else self.unp1
-        if bc == 0:  # Dirichlet condition
-            #u[0] = 0
-            #u[-1] = 0
-            pass #implemented in D2 instead
+        if isinstance(bc, int): #allow int input if same BC on both ends
+            bcl, bcr = bc, bc
+        elif isinstance(bc,dict):
+            bcl = bc['left']
+            bcr = bc['right']
 
-        elif bc == 1:  # Neumann condition
+        u = u if u is not None else self.unp1
+
+        if bcl == 0:
             pass
 
-        elif bc == 2:  # Open boundary
+        elif bcl == 1:
+            pass
+
+        elif bcl == 2:  # Open boundary on left
             u[0] = 2*(1-self.c)*self.un[0] - (1-self.cfl)/(1+self.cfl)*self.unm1[0]+2*self.cfl**2/(1+self.cfl)*self.un[1]
+
+        if bcr == 0:
+            pass
+
+        elif bcr == 1:
+            pass
+
+        elif bcr == 2: #Open on right
             u[-1] = 2*(1-self.c)*self.un[-1] - (1-self.cfl)/(1+self.cfl)*self.unm1[-1]+2*self.cfl**2/(1+self.cfl)*self.un[-2]
 
-        elif bc == 3:
+        elif bcl == 3 and bcr == 3: #periodic boundary
             u[-1] = u[0]
 
         else:
-            raise RuntimeError(f"Wrong bc = {bc}")
+            raise RuntimeError(f"Wrong bc = {bcl,bcr}")
 
     @property
     def dt(self) -> float:
@@ -226,10 +254,36 @@ def test_pulse_bcs():
     data = sol(100, bc=3, ic=1, save_step=100)
     assert np.linalg.norm(data[0] - data[100]) < 1e-12
 
+    #test mixed BC
+    data = sol(100, bc={'left':0,'right':1}, ic=0, save_step=100)
+    assert np.linalg.norm(data[0] + data[100]) < 1e-12 #wave is reflected
+    data = sol(100, bc={'left':0,'right':1}, ic=1, save_step=100)
+    assert np.linalg.norm(data[100]) < 1e-12 #waves cancel eachother
+    data = sol(100, bc={'left':1,'right':0}, ic=0, save_step=100)
+    assert np.linalg.norm(data[0] - data[100]) < 1e-12 #wave is sent
+    data = sol(100, bc={'left':1,'right':0}, ic=1, save_step=100)
+    assert np.linalg.norm(data[100]) < 1e-12 #wave cancel eachother
+    data = sol(100, bc={'left':0,'right':2}, ic=0, save_step=100)
+    assert np.linalg.norm(data[0] + data[100]) < 1e-12 #wave is reflected
+    data = sol(100, bc={'left':0,'right':2}, ic=1, save_step=100)
+    assert np.linalg.norm(data[0] + 2*data[100]) < 1e-12 #half is reflected from left other half dissapears from right
+    data = sol(100, bc={'left':2,'right':0}, ic=0, save_step=100)
+    assert np.linalg.norm(data[100]) < 1e-12 #wave dissapears
+    data = sol(100, bc={'left':2,'right':0}, ic=1, save_step=100)
+    assert np.linalg.norm(data[0] + 2*data[100]) < 1e-12 # half wave dissapears to left and half wave is reflected from right
+    data = sol(100, bc={'left':1,'right':2}, ic=0, save_step=100)
+    assert np.linalg.norm(data[0] - data[100]) < 1e-12 #wave sent from left dissapears from right
+    data = sol(100, bc={'left':1,'right':2}, ic=1, save_step=100)
+    assert np.linalg.norm(data[0] - 2*data[100]) < 1e-12 #half wave sent from left half wave dissapears from right
+    data = sol(100, bc={'left':2,'right':1}, ic=0, save_step=100)
+    assert np.linalg.norm(data[100]) < 1e-12 #wave dissapears from left
+    data = sol(100, bc={'left':2,'right':1}, ic=1, save_step=100)#half wave dissapears from left halwave sent from right
+    assert np.linalg.norm(data[0] - 2*data[100]) < 1e-12
+
 
 if __name__ == "__main__":
-    # sol = Wave1D(100, cfl=1, L0=2, c0=1)
-    # data = sol(100, bc=3, save_step=1, ic=1)
-    # sol.animation(data)
+    #sol = Wave1D(100, cfl=1, L0=2, c0=1)
+    #data = sol(100, bc={'left':1,'right':0}, ic=1, save_step=10)
+    #sol.animation(data)
     test_pulse_bcs()
     # data = sol(200, bc=2, ic=0, save_step=100)
