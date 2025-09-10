@@ -175,6 +175,8 @@ class Wave1D:
         self.cfl = C = self.cfl if cfl is None else cfl
         dt = self.dt
         u0 = sp.lambdify(x, self.u0.subs({L: self.L, c: self.c, t: 0}))
+        self.ic = ic
+        self.bc = bc
 
         # First step. Set un and unm1
         self.unm1[:] = u0(self.x)  # unm1 = u(x, 0)
@@ -217,6 +219,7 @@ class Wave1D:
         from matplotlib import animation
 
         fig, ax = plt.subplots()
+        plt.title(f'ic={self.ic}, bc={self.bc}')
         v = np.array(list(data.values()))
         t = np.array(list(data.keys()))
         save_step = t[1] - t[0]
@@ -229,7 +232,7 @@ class Wave1D:
 
         ani = animation.FuncAnimation(fig=fig, func=update, frames=len(data), blit=True)
         ani.save(
-            "wavemovie.apng", writer="pillow", fps=5
+            f"wavemovie_ic{self.ic}.gif", writer="pillow", fps=5
         )  # This animated png opens in a browser
         ani.to_jshtml()
         plt.show()
@@ -277,13 +280,13 @@ def test_pulse_bcs():
     assert np.linalg.norm(data[0] - 2*data[100]) < 1e-12 #half wave sent from left half wave dissapears from right
     data = sol(100, bc={'left':2,'right':1}, ic=0, save_step=100)
     assert np.linalg.norm(data[100]) < 1e-12 #wave dissapears from left
-    data = sol(100, bc={'left':2,'right':1}, ic=1, save_step=100)#half wave dissapears from left halwave sent from right
-    assert np.linalg.norm(data[0] - 2*data[100]) < 1e-12
+    data = sol(100, bc={'left':2,'right':1}, ic=1, save_step=100)
+    assert np.linalg.norm(data[0] - 2*data[100]) < 1e-12 #half wave dissapears from left halwave sent from right
 
 
 if __name__ == "__main__":
-    #sol = Wave1D(100, cfl=1, L0=2, c0=1)
-    #data = sol(100, bc={'left':1,'right':0}, ic=1, save_step=10)
-    #sol.animation(data)
+    sol = Wave1D(100, cfl=1, L0=2, c0=1)
+    data = sol(100, bc={'left':1,'right':0}, ic=0, save_step=10)
+    sol.animation(data)
     test_pulse_bcs()
     # data = sol(200, bc=2, ic=0, save_step=100)
