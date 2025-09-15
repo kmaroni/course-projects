@@ -113,7 +113,21 @@ class Poisson:
         return np.sqrt(self.dx*np.sum((uj-u)**2))
 
 def test_poisson():
-    assert False
+    tol = 1e-5
+    L = 1
+    sol = Poisson(L=L)
+    exactSolutions = [
+    sp.exp(4*sp.cos(x)),
+    x**2,
+    sp.sin(2*x)
+    ]
+    #ue = sp.exp(4*sp.cos(x))
+    #ue = x**2
+    for ue in exactSolutions:
+        bc = (ue.subs(x, 0), ue.subs(x, L))
+        u = sol(1001, bc=bc, f=sp.diff(ue, x, 2))
+        err = sol.l2_error(u,ue)
+        assert err < tol
 
 if __name__ == '__main__':
     L = 2
@@ -126,3 +140,4 @@ if __name__ == '__main__':
     print(f'Boundary conditions: u(0)={bc[0]:2.4f}, u(L)={bc[1]:2.2f}')
     print(f'Discretization: N = {sol.N}')
     print(f'L2-error {sol.l2_error(u, ue)}')
+    test_poisson()
