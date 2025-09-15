@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import scipy.sparse as sparse
 from sympy.utilities.lambdify import implemented_function
 from poisson import Poisson
+import time
 
 x, y = sp.symbols('x,y')
 
@@ -61,7 +62,7 @@ class Poisson2D:
         ue : Sympy function
             The analytical solution
         """
-        uj = sp.lambdify([x, y], ue)(self.px.x,self.py.x)
+        uj = sp.lambdify([x, y], ue)(self.xij,self.yij)
         return np.sqrt(self.px.dx*self.py.dx*np.sum((uj-u)**2))
 
     def __call__(self, bc=0, f=implemented_function('f', lambda x, y: 2)(x, y)):
@@ -78,15 +79,28 @@ class Poisson2D:
 
         """
         A, b = self.assemble(bc,f=f)
+        midpointTime = time.time()
         return sparse.linalg.spsolve(A, b.ravel()).reshape((self.px.N+1, self.py.N+1))
 
 def test_poisson2d():
-    assert False
+    tol = 1
+    Lx, Ly, Nx, Ny = 1, 1, 500, 500
+    sol = Poisson2D(Lx, Ly, Nx, Ny)
+    exactSolutions=[
+    x*(1-x)*y*(1-y),
+    ]
+    for ue in exactSolutions:
+        u=sol(bc=0,f=ue.diff(x, 2) + ue.diff(y, 2))
+        err = sol.l2_error(u,ue)
+        assert err < tol
 
 if __name__ == '__main__':
-    Lx, Ly, Nx, Ny = 1, 1, 100, 100
-    sol = Poisson2D(Lx, Ly, Nx, Ny)
-    ue = x*(1-x)*y*(1-y)
-    u=sol(bc=0,f=ue.diff(x, 2) + ue.diff(y, 2))
-    err = sol.l2_error(u,ue)
-    print(err)
+    startTime = time.time()
+    test_poisson2d()
+    endTime = time.time()
+
+    assembleTime = midpointTime - startTime
+    elapsedTime = endTime - startTime
+
+    print(f'Time to assemble: {assembleTime:.4f}s')
+    print(f'Time to run:      {elapsedTime:.4f}s')
