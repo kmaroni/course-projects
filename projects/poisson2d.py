@@ -87,7 +87,7 @@ class Poisson2D:
 
 def test_poisson2d():
     tol = 1e-4
-    Lx, Ly, Nx, Ny = 1, 1, 100,  #Test for Nx =/= Ny
+    Lx, Ly, Nx, Ny = 1, 1, 100, 200 #Test for Nx =/= Ny
     sol = Poisson2D(Lx, Ly, Nx, Ny)
     exactSolutions=[
     x*(1-x)*y*(1-y)*sp.exp(sp.cos(4*sp.pi*x)*sp.sin(2*sp.pi*y)),
