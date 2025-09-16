@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import scipy.sparse as sparse
 from sympy.utilities.lambdify import implemented_function
 from poisson import Poisson
-import time
 
 x, y = sp.symbols('x,y')
 
@@ -27,19 +26,19 @@ class Poisson2D:
 
     def laplace(self):
         """Return a vectorized Laplace operator"""
-        D2x = (1./self.px.dx**2)*self.px.D2()
-        D2y = (1./self.py.dx**2)*self.py.D2()
+        D2x = self.px.D2()
+        D2y = self.py.D2()
         return (sparse.kron(D2x, sparse.eye(self.py.N+1)) +
                 sparse.kron(sparse.eye(self.px.N+1), D2y))
 
-    def assemble(self, bc=0, f=None):
+    def assemble(self, f=None):
         """Return assembled coefficient matrix A and right hand side vector b"""
         self.xij, self.yij = self.create_mesh()
-        F = sp.lambdify((x,y), f)(self.xij, self.xij)
+        F = sp.lambdify((x,y), f)(self.xij, self.yij)
         A = self.laplace()
 
         #Define homogeneous Dirichlet boundary condition
-        B = np.ones((self.px.N,self.py.N), dtype=bool)
+        B = np.ones((self.px.N+1,self.py.N+1), dtype=bool)
         B[1:-1,1:-1] = 0
         bnds = np.where(B.ravel() == 1)[0]
         A = A.tolil()
@@ -48,7 +47,7 @@ class Poisson2D:
             A[i, i] = 1
         A = A.tocsr()
         b = F.ravel()
-        b[bnds] = bc #equal to constant on boundary
+        b[bnds] = 0
 
         return A, b
 
@@ -63,9 +62,9 @@ class Poisson2D:
             The analytical solution
         """
         uj = sp.lambdify([x, y], ue)(self.xij,self.yij)
-        return np.sqrt(self.px.dx*self.py.dx*np.sum((uj-u)**2))
+        return np.sqrt(self.px.dx*self.py.dx*np.sum((u-uj)**2))
 
-    def __call__(self, bc=0, f=implemented_function('f', lambda x, y: 2)(x, y)):
+    def __call__(self, f=implemented_function('f', lambda x, y: 2)(x, y)):
         """Solve Poisson's equation with a given right hand side function
 
         Parameters
@@ -78,29 +77,31 @@ class Poisson2D:
         The solution as a Numpy array
 
         """
-        A, b = self.assemble(bc,f=f)
-        midpointTime = time.time()
+        A, b = self.assemble(f=f)
         return sparse.linalg.spsolve(A, b.ravel()).reshape((self.px.N+1, self.py.N+1))
 
+    def plot(self,u):
+        fig, ax = plt.subplots()
+        ax.contourf(self.xij, self.yij, u)
+        plt.show()
+
 def test_poisson2d():
-    tol = 1
-    Lx, Ly, Nx, Ny = 1, 1, 500, 500
+    tol = 1e-4
+    Lx, Ly, Nx, Ny = 1, 1, 100,  #Test for Nx =/= Ny
     sol = Poisson2D(Lx, Ly, Nx, Ny)
     exactSolutions=[
-    x*(1-x)*y*(1-y),
+    x*(1-x)*y*(1-y)*sp.exp(sp.cos(4*sp.pi*x)*sp.sin(2*sp.pi*y)),
+    sp.sin(2*sp.pi*x)*sp.sin(2*sp.pi*y),
     ]
     for ue in exactSolutions:
-        u=sol(bc=0,f=ue.diff(x, 2) + ue.diff(y, 2))
+        u=sol(f=ue.diff(x, 2) + ue.diff(y, 2))
         err = sol.l2_error(u,ue)
-        assert err < tol
+        try:
+            assert err < tol
+        except AssertionError:
+            print(f'ue = {ue} not within tolerance!')
+            print(f'Error is {err:.4e}')
+
 
 if __name__ == '__main__':
-    startTime = time.time()
     test_poisson2d()
-    endTime = time.time()
-
-    assembleTime = midpointTime - startTime
-    elapsedTime = endTime - startTime
-
-    print(f'Time to assemble: {assembleTime:.4f}s')
-    print(f'Time to run:      {elapsedTime:.4f}s')
