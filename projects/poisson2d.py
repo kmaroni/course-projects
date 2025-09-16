@@ -87,14 +87,35 @@ class Poisson2D:
 
 def test_poisson2d():
     tol = 1e-4
-    Lx, Ly, Nx, Ny = 1, 1, 100, 200 #Test for Nx =/= Ny
-    sol = Poisson2D(Lx, Ly, Nx, Ny)
-    exactSolutions=[
-    x*(1-x)*y*(1-y)*sp.exp(sp.cos(4*sp.pi*x)*sp.sin(2*sp.pi*y)),
-    sp.sin(2*sp.pi*x)*sp.sin(2*sp.pi*y),
-    ]
-    for ue in exactSolutions:
+
+    #Define tests as dicts with exact solution and parameters
+    test1 = {
+    'ue': x*(1-x)*y*(1-y)*sp.exp(sp.cos(4*sp.pi*x)*sp.sin(2*sp.pi*y)),
+    'parameters': (1, 1, 100, 200)
+    }
+
+    test2 = {
+    'ue': sp.sin(2*sp.pi*x)*sp.sin(2*sp.pi*y),
+    'parameters': (1, 1, 100, 200)
+    }
+
+    test2 = {
+    'ue': sp.sin(2*sp.pi*x)*sp.sin(2*sp.pi*y),
+    'parameters': (1, 1, 100, 200)
+    }
+
+    test3 = {
+    'ue': x*(2-x)*sp.sin(2*sp.pi*y)+sp.sin(sp.pi*x)*y*sp.cos(y),
+    'parameters': (2, 1, 300, 200)
+    }
+
+    testsList = [test1,test2,test3]
+    for test in testsList:
+        ue = test['ue']
+        Lx, Ly, Nx, Ny = test['parameters']
+        sol = Poisson2D(Lx, Ly, Nx, Ny)
         u=sol(f=ue.diff(x, 2) + ue.diff(y, 2))
+
         err = sol.l2_error(u,ue)
         try:
             assert err < tol
