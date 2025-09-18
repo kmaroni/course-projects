@@ -85,7 +85,35 @@ class Poisson2D:
         ax.contourf(self.xij, self.yij, u)
         plt.show()
 
-def test_poisson2d():
+def convergence_rates(ue, m=6):
+    h, E = [], []
+    N0 = 10
+    for i in range(m):
+        sol = Poisson2D(1,1,N0,N0)
+        u=sol(f=ue.diff(x, 2) + ue.diff(y, 2))
+        err = sol.l2_error(u,ue)
+        E.append(err)
+        h.append(sol.px.dx)
+        N0 *= 2
+    r = [np.log(E[i-1]/E[i])/np.log(h[i-1]/h[i]) for i in range(1,m)]
+    return r
+
+def test_poisson2d_rates():
+    exact_solutions = [
+        x*(1-x)*y*(1-y)*sp.exp(sp.cos(4*sp.pi*x)*sp.sin(2*sp.pi*y)),
+        sp.sin(2*sp.pi*x)*sp.sin(2*sp.pi*y),
+        sp.sin(2*sp.pi*x)*sp.sin(2*sp.pi*y)
+        ]
+
+    for ue in exact_solutions:
+        r = convergence_rates(ue)
+        try:
+            assert np.abs(r[-1]-2) < 1e2
+        except AssertionError:
+            print(f'Scheme is not 2nd order for ue={ue}!')
+            print(f'Convergence rate is {r[-1]}')
+
+def test_poisson2d_error():
     tol = 1e-4
 
     #Define tests as dicts with exact solution and parameters
@@ -123,6 +151,6 @@ def test_poisson2d():
             print(f'ue = {ue} not within tolerance!')
             print(f'Error is {err:.4e}')
 
-
 if __name__ == '__main__':
-    test_poisson2d()
+    test_poisson2d_rates()
+    test_poisson2d_error()
