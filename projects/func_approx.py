@@ -5,9 +5,6 @@ from sympy import besselj
 from scipy.integrate import quad
 from scipy.interpolate import lagrange
 import matplotlib.pyplot as plt
-from tqdm import tqdm
-
-
 
 x = sp.symbols('x')
 
