@@ -59,11 +59,6 @@ class Galerkin:
             plt.legend()
             plt.show()
 
-
-
-
-
-
 class Collocation(Galerkin):
 
     def lin_mesh(self,N):
