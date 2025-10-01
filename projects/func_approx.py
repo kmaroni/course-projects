@@ -48,13 +48,16 @@ class Galerkin:
 
         return uN #,uL
 
-    def plot(self,uN,ax):
-        xj, Xj = self.create_mesh()
-        u = sp.lambdify(x, self.u)(xj)
-        uN = sp.lambdify(x, uN)(Xj)
-        ax.plot(xj, uN,'--',label=f'u_{self.N}')
-        ax.plot(xj, u,'b')
+    def plot(self,uN,ax,show=False):
+        yj, Yj = self.create_mesh()
+        u = sp.lambdify(x, self.u)(yj)
+        uN = sp.lambdify(x, uN)(Yj)
+        ax.plot(yj, uN,'--',label=f'u_{self.N}')
+        ax.plot(yj, u,'b')
         ax.set_title(self.u)
+        if show:
+            plt.legend()
+            plt.show()
 
 
 
@@ -95,16 +98,6 @@ class Collocation(Galerkin):
         uN = self.lagrange_function(self.uj,basis)
 
         return uN
-
-    def plot(self,uN,ax):
-        yj, Yj = self.create_mesh()
-        xj_ = self.a+(self.b-self.a)/2*(self.xj+1)
-        u = sp.lambdify(x, self.u)(yj)
-        uN = sp.lambdify(x, uN)(Yj)
-        ax.plot(yj, uN,'--',label=f'u_{self.N}')
-        ax.plot(yj, u,'b')
-        ax.plot(xj_,self.uj, 'bo')
-        ax.set_title(self.u)
 
 if __name__ == '__main__':
     funcs = {#function, interval=(a,b), N
